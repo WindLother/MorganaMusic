@@ -87,9 +87,6 @@ class MusicBot(commands.Cog):
         self.history = list()
         
     async def setup(self):
-        """
-        Sets up a connection to lavalink
-        """
         await wavelink.NodePool.create_node(
             bot=self.bot, 
             host="localhost",
@@ -104,65 +101,67 @@ class MusicBot(commands.Cog):
     
     @commands.Cog.listener()
     async def on_wavelink_track_start(self, player: wavelink.Player, track: wavelink.Track):
-        await self.music_channel.send(f"{track.title} started playing")
+        await self.music_channel.send(f"{track.title} começou a tocar")
         
     @commands.Cog.listener()
     async def on_wavelink_track_end(self, player: wavelink.Player, track: wavelink.Track, reason):
-        await self.music_channel.send(f"{track.title} finished")
+        await self.music_channel.send(f"{track.title} música finalizada")
         self.history.append(track.title)
-    
-    @commands.command(brief="Manually joins the bot into the voice channel")
+
+    @commands.command(brief="Faça o bot entrar manualmente num canal de voz")
     async def join(self, ctx):
         channel = ctx.message.author.voice.channel
         self.music_channel = ctx.message.channel
         if not channel:
-            await ctx.send(f"You need to join a voice channel first.")
-            return 
+            embed = discord.Embed(title=":warning: Erro", description="Você precisa entrar num canal de voz antes.",
+                                  color=discord.Color.red())
+            await ctx.send(embed=embed)
+            return
         self.vc = await channel.connect(cls=wavelink.Player)
-        await ctx.send(f"Joined {channel.name}")
-        
-    @commands.command(brief="Search for a youtube track")
-    async def add(self, ctx, *title : str):
-        # You could have a few choices of commands and say 
-        # !search yt <title>
-        # or !search spotify <title>
-        # or !search soundcloud <title> 
+        embed = discord.Embed(title=":white_check_mark: Sucesso", description=f"Entrei em {channel.name}",
+                              color=discord.Color.green())
+        await ctx.send(embed=embed)
+
+    @commands.command(brief="Busca por uma música no YouTube")
+    async def add(self, ctx, *title: str):
         chosen_track = await wavelink.YouTubeTrack.search(query=" ".join(title), return_first=True)
         if chosen_track:
             self.current_track = chosen_track
-            await ctx.send(f"Added {chosen_track.title} to the Queue")
+            embed = discord.Embed(title=":musical_note: Música adicionada",
+                                  description=f"Adicionado {chosen_track.title} na fila", color=discord.Color.green())
+            await ctx.send(embed=embed)
             self.vc.queue.put(chosen_track)
-        
-    @commands.command(brief="Play the current track")
+        else:
+            embed = discord.Embed(title=":warning: Erro", description="Não foi possível encontrar a música.",
+                                  color=discord.Color.red())
+            await ctx.send(embed=embed)
+
+    @commands.command(brief="Toca a faixa atual")
     async def play(self, ctx):
-        # in the video you will see the issue that arises with this
-        # check out the build in wavelink Queue object - also in the skip
         if self.current_track and self.vc:
             await self.vc.play(self.current_track)
-            
-    @commands.command(brief="Skips the current song")
-    async def skip(self, ctx):
-        if self.vc.queue.is_empty:
-            await ctx.send("There are no more tracks!")
-            return 
-        self.current_track = self.vc.queue.get()
-        await self.vc.play(self.current_track)
-    
-    @commands.command(brief="Pause playing song")
+            embed = discord.Embed(title=":notes: Tocando agora", description=self.current_track.title,
+                                  color=discord.Color.green())
+            await ctx.send(embed=embed)
+
+    @commands.command(brief="Pausa a música atual")
     async def pause(self, ctx):
         await self.vc.pause()
-        await ctx.send(f"Paused current Track")            
-        
-    @commands.command(brief="Resumes current paused song")
+        embed = discord.Embed(title=":pause_button: Música pausada", color=discord.Color.dark_orange())
+        await ctx.send(embed=embed)
+
+    @commands.command(brief="Retoma a música pausada")
     async def resume(self, ctx):
         await self.vc.resume()
-        await ctx.send(f"Resuming current Track")
-        
-    @commands.command(brief="Stops current song")
+        embed = discord.Embed(title=":arrow_forward: Retomando a faixa atual", color=discord.Color.green())
+        await ctx.send(embed=embed)
+
+    @commands.command(brief="Para a música atual")
     async def stop(self, ctx):
         await self.vc.stop()
-        
-    
+        embed = discord.Embed(title=":stop_button: Música parada", color=discord.Color.red())
+        await ctx.send(embed=embed)
+
     @commands.command(brief="Fast Forward n seconds")
     async def ff(self, ctx, seconds : int = 15):
         new_position = self.vc.position + seconds
